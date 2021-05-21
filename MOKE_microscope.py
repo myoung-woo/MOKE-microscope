@@ -3,13 +3,15 @@
 Created on Tue May  4 22:47:39 2021
 
 @author: MYOUNG-WOO
+
+MOKE microscope v1.0.0
 """
 
 from pyueye import ueye
 import numpy as np
 import cv2
 import sys
-from skimage import data, img_as_float
+from skimage.util import img_as_ubyte
 from skimage import exposure, io
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QPixmap, QColor
@@ -27,7 +29,7 @@ class WindowClass(QMainWindow, form_class) :
 
 ##############################################################################
         
-       # Button connection
+       # Button connection ###################################################
         self.Movie_Button.clicked.connect(self.Movie)
         self.Contrast_Button.clicked.connect(self.Contrast_Enhancement)
         self.Diff_Button.clicked.connect(self.Differential_Image)
@@ -35,14 +37,17 @@ class WindowClass(QMainWindow, form_class) :
         self.SetFPS_Button.clicked.connect(self.Set_FPS)
         self.SetExp_Button.clicked.connect(self.Set_Exp)
         self.Save_Button.clicked.connect(self.Save)
+        self.Rec_Button.clicked.connect(self.Rec)
         self.Exit_Button.clicked.connect(self.Exit)
        
-       # Initial switch setting
+       # Initial switch setting ##############################################
         self.Movie_Switch = -1
         self.Contrast_Switch = -1
         self.Diff_Switch = -1
         self.SetBG_Switch = -1
-        
+        self.Rec_Switch = -1
+       
+       # Indicator ###########################################################
         if self.Movie_Switch == 1:
             self.Movie_Text_Browser.setText("On")
             self.Movie_Text_Browser.setAlignment(QtCore.Qt.AlignCenter);
@@ -64,10 +69,19 @@ class WindowClass(QMainWindow, form_class) :
             self.Diff_Text_Browser.setPlainText("Off")
             self.Diff_Text_Browser.setAlignment(QtCore.Qt.AlignCenter)
             
+        if self.Rec_Switch == 1:
+            self.Rec_Text_Browser.setPlainText("Rec On")
+            self.Rec_Text_Browser.setAlignment(QtCore.Qt.AlignCenter)
+        elif self.Rec_Switch == -1:
+            self.Rec_Text_Browser.setPlainText("Rec Off")
+            self.Rec_Text_Browser.setAlignment(QtCore.Qt.AlignCenter)
+            
+       
+       # Camera Initialization ###############################################
         self.Camera_Initialization()
        
-       # Set dummy background image 
-        self.bg_raw = ueye.get_data(self.mem_ptr, self.width, self.height, self.bitspixel, self.lineinc, copy=False)
+       # Set dummy background image (Black image) ############################
+        self.bg_raw = ueye.get_data(self.mem_ptr, self.width, self.height, self.bitspixel, self.lineinc, copy=True)
         self.bg = np.reshape(self.bg_raw, (self.height, self.width, 1)).astype(np.float64)
         self.FinalImage = self.bg
         
@@ -75,29 +89,29 @@ class WindowClass(QMainWindow, form_class) :
         self.bg_resize = QtGui.QImage(self.bg_resize, self.bg_resize.shape[1], self.bg_resize.shape[0], QtGui.QImage.Format_Indexed8)
         self.Movie_Frame.setPixmap(QtGui.QPixmap.fromImage(self.bg_resize))
         
-        #self.value = ueye.c_double(0)
-        #self.value_to_return = ueye.c_double()
-        #self.nRet = ueye.is_SetAutoParameter(self.hcam, ueye.IS_SET_ENABLE_AUTO_SHUTTER, self.value, self.value_to_return)
+        self.value = ueye.c_double(0)
+        self.value_to_return = ueye.c_double()
+        self.nRet = ueye.is_SetAutoParameter(self.hcam, ueye.IS_SET_ENABLE_AUTO_SHUTTER, self.value, self.value_to_return)
         
-        #self.value = ueye.c_double(0)
-        #self.value_to_return = ueye.c_double()
-        #self.nRet = ueye.is_SetAutoParameter(self.hcam, ueye.IS_SET_ENABLE_AUTO_GAIN, self.value, self.value_to_return)
+        self.value = ueye.c_double(0)
+        self.value_to_return = ueye.c_double()
+        self.nRet = ueye.is_SetAutoParameter(self.hcam, ueye.IS_SET_ENABLE_AUTO_GAIN, self.value, self.value_to_return)
         
         self.SetFPS_lineEdit.setText(str("%.2f" % self.IDS_FPS).zfill(5))
         self.SetFPS_lineEdit.setAlignment(QtCore.Qt.AlignRight)
         
         self.SetExp_lineEdit.setText(str("%.2f" % self.IDS_exposure).zfill(5))
         self.SetExp_lineEdit.setAlignment(QtCore.Qt.AlignRight)
+
     
     def Camera_Initialization(self):
-        # Camera initialization
         self.hcam = ueye.HIDS(0)
         self.ret = ueye.is_InitCamera(self.hcam, None)
         self.ret = ueye.is_SetColorMode(self.hcam, ueye.IS_CM_MONO8)
         self.IDS_FPS = float(5)
         self.newrate = ueye.DOUBLE(self.IDS_FPS)
         self.rate = ueye.DOUBLE(self.IDS_FPS)
-        self.IDS_exposure = float(17)
+        self.IDS_exposure = float(150)
         
         self.width = 2056
         self.height = 1542
@@ -115,7 +129,8 @@ class WindowClass(QMainWindow, form_class) :
         
         self.ret = ueye.is_SetImageMem(self.hcam, self.mem_ptr, self.mem_id)
         self.ret = ueye.is_CaptureVideo(self.hcam, ueye.IS_DONT_WAIT)
-        self.lineinc = self.width * int((self.bitspixel + 7) / 8)
+        #self.lineinc = self.width * int((self.bitspixel + 7) / 8)
+        self.lineinc = self.width * int(self.bitspixel / 8)
         
         self.nRet = ueye.is_SetFrameRate(self.hcam, self.rate, self.newrate)
         self.expms = ueye.DOUBLE(self.IDS_exposure)
@@ -129,7 +144,7 @@ class WindowClass(QMainWindow, form_class) :
             self.Movie_Text_Browser.setAlignment(QtCore.Qt.AlignCenter)
         elif self.Movie_Switch == -1:
             self.Movie_Text_Browser.setText("Off")
-            self.Movie_Text_Browser.setAlignment(QtCore.Qt.AlignCenter)
+            self.Movie_Text_Browser.setAlignment(QtCore.Qt.AlignCenter)        
         
         while(self.Movie_Switch == 1):
             self.fps = ueye.c_double()
@@ -143,7 +158,7 @@ class WindowClass(QMainWindow, form_class) :
             self.Exp_Text_Browser.setAlignment(QtCore.Qt.AlignRight)
             
             self.img_raw = ueye.get_data(self.mem_ptr, self.width, self.height, self.bitspixel, self.lineinc, copy=False)
-
+            
             if self.Diff_Switch == -1:
                 self.img = np.reshape(self.img_raw, (self.height, self.width, 1)).astype(np.uint8)
             elif self.Diff_Switch == 1:
@@ -151,20 +166,66 @@ class WindowClass(QMainWindow, form_class) :
                 self.img = np.round((self.img0-self.bg+255)/2).astype(np.uint8)
             
             if self.Contrast_Switch == 1:
-                self.p2, self.p98 = np.percentile(self.img, (2, 98))
-                self.img = exposure.rescale_intensity(self.img, in_range=(self.p2, self.p98))
-                #self.img = np.round(exposure.equalize_adapthist(np.reshape(self.img, (self.height, self.width)), clip_limit=0.1)*256).astype(np.uint8)
-                #self.img = np.reshape(self.img, (self.height, self.width, 1))
-                #cv2.fastNlMeansDenoising(self.img, self.img, 10, 7, 21)
-            
+                self.img = np.reshape(self.img, (self.height, self.width))
+               
+               # Contrast stretching
+                #self.pL, self.pH = np.percentile(self.img, (2, 98))
+                #self.img = exposure.rescale_intensity(self.img, in_range=(self.pL, self.pH))
+               
+               # Equalization
+                self.img = img_as_ubyte(exposure.equalize_hist(self.img))
+               
+               # Adaptive Equalization 
+                #self.img = img_as_ubyte(exposure.equalize_adapthist(self.img, clip_limit=0.5))
+                
+                self.img = np.reshape(self.img, (self.height, self.width, 1))
+
+
             self.FinalImage = self.img
             
+            if self.Rec_Switch == 1:
+                if 'vid' in locals():
+                    vid = np.append(vid, self.FinalImage, axis=2)
+                    if vid.shape[2] > 10000:
+                        vid = np.delete(vid, 0, axis=2)
+                    self.Time_1 = time.time()
+                    self.Time = np.append(self.Time, self.Time_1-self.Time_0)
+                    self.Time_0 = self.Time_1
+                    
+                else:
+                    vid = np.zeros([self.height, self.width])
+                    vid = self.FinalImage
+                    self.Time_0 = time.time()
+                    self.Time = 0
+            
+            if 'vid' in locals() and self.Rec_Switch == -1:
+                # selecting file path
+                filePath, _ = QFileDialog.getSaveFileName(self, "Save Video", "", "avi(*.avi);;All Files(*.*) ")
+          
+                # if file path is blank return back
+                if filePath == "":
+                    return
+                
+                self.fps = np.round(1/np.median(self.Time))
+                
+                out = cv2.VideoWriter(filePath, cv2.VideoWriter_fourcc(*'DIVX'), self.fps, (self.width, self.height), isColor=False)
+                for i in range(0, vid.shape[2]):
+                    img = vid[:, :, i]
+                    out.write(img)
+                
+                out.release()
+                del vid
+                del self.Time
+            
             self.img_resize = cv2.resize(self.FinalImage,(0,0), fx=0.5, fy=0.5)
+            #self.img_resize = QtGui.QImage(self.img_resize, self.img_resize.shape[1], self.img_resize.shape[0], QtGui.QImage.Format_Indexed8)
             self.img_resize = QtGui.QImage(self.img_resize, self.img_resize.shape[1], self.img_resize.shape[0], QtGui.QImage.Format_Indexed8)
+            
             self.Movie_Frame.setPixmap(QtGui.QPixmap.fromImage(self.img_resize))
            
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
+
         
     def Contrast_Enhancement(self):
         self.Contrast_Switch = -1*self.Contrast_Switch
@@ -174,6 +235,7 @@ class WindowClass(QMainWindow, form_class) :
         elif self.Contrast_Switch == -1:
             self.Contrast_Text_Browser.setPlainText("Off")
             self.Contrast_Text_Browser.setAlignment(QtCore.Qt.AlignCenter)
+
     
     def Differential_Image(self):
         self.Diff_Switch = -1*self.Diff_Switch
@@ -183,23 +245,27 @@ class WindowClass(QMainWindow, form_class) :
         elif self.Diff_Switch == -1:
             self.Diff_Text_Browser.setPlainText("Off")
             self.Diff_Text_Browser.setAlignment(QtCore.Qt.AlignCenter)
+
     
     def Set_Background(self):
         self.bg_raw = ueye.get_data(self.mem_ptr, self.width, self.height, self.bitspixel, self.lineinc, copy=False)
         time.sleep(0.5)
         self.bg = np.reshape(self.bg_raw, (self.height, self.width, 1)).astype(np.float64)
+
         
     def Set_FPS(self):
         if self.Movie_Switch == 1:
             self.rate = ueye.DOUBLE(float(self.SetFPS_lineEdit.text()))
             self.newrate = ueye.DOUBLE(float(self.SetFPS_lineEdit.text()))
             self.nRet = ueye.is_SetFrameRate(self.hcam, self.rate, self.newrate)
+
         
     def Set_Exp(self):
         if self.Movie_Switch == 1:
             self.exposure = ueye.DOUBLE(float(self.SetExp_lineEdit.text()))
             self.expms = ueye.DOUBLE(self.exposure)
             self.nRet = ueye.is_Exposure(self.hcam, ueye.IS_EXPOSURE_CMD_SET_EXPOSURE, self.expms, ueye.sizeof(self.expms))
+
     
     def Save(self):          
         # selecting file path
@@ -212,7 +278,18 @@ class WindowClass(QMainWindow, form_class) :
         # saving canvas at desired path
         # self.SaveImage.save("a.png")  
         io.imsave(filePath, self.FinalImage)
-   
+        
+        
+    def Rec(self): 
+        self.Rec_Switch = -1*self.Rec_Switch
+        if self.Rec_Switch == 1:
+            self.Rec_Text_Browser.setText("Rec On")
+            self.Rec_Text_Browser.setAlignment(QtCore.Qt.AlignCenter)
+        elif self.Rec_Switch == -1:
+            self.Rec_Text_Browser.setText("Rec Off")
+            self.Rec_Text_Browser.setAlignment(QtCore.Qt.AlignCenter)
+        
+    
     def Exit(self):
         self.Movie_Switch = -1
         #time.sleep(1)

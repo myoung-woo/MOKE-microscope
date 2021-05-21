@@ -19,7 +19,7 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>MOKE microscope (Axel's group)</string>
+   <string>MOKE microscope</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QPushButton" name="Movie_Button">
@@ -105,7 +105,7 @@ p, li { white-space: pre-wrap; }
       <x>850</x>
       <y>800</y>
       <width>200</width>
-      <height>80</height>
+      <height>40</height>
      </rect>
     </property>
     <property name="font">
@@ -399,6 +399,51 @@ p, li { white-space: pre-wrap; }
      <string>Set Exp.</string>
     </property>
    </widget>
+   <widget class="QPushButton" name="Rec_Button">
+    <property name="geometry">
+     <rect>
+      <x>850</x>
+      <y>850</y>
+      <width>200</width>
+      <height>40</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Arial Black</family>
+      <pointsize>12</pointsize>
+      <weight>50</weight>
+      <italic>false</italic>
+      <bold>false</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string>Record Video</string>
+    </property>
+   </widget>
+   <widget class="QTextBrowser" name="Rec_Text_Browser">
+    <property name="geometry">
+     <rect>
+      <x>850</x>
+      <y>900</y>
+      <width>200</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Arial Black</family>
+      <pointsize>10</pointsize>
+     </font>
+    </property>
+    <property name="html">
+     <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Arial Black'; font-size:10pt; font-weight:600; font-style:normal;&quot;&gt;
+&lt;p align=&quot;center&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:'Gulim';&quot;&gt;Rec Off&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
@@ -406,7 +451,7 @@ p, li { white-space: pre-wrap; }
      <x>0</x>
      <y>0</y>
      <width>1400</width>
-     <height>24</height>
+     <height>21</height>
     </rect>
    </property>
   </widget>
