@@ -111,14 +111,14 @@ p, li { white-space: pre-wrap; }
     <property name="font">
      <font>
       <family>Arial Black</family>
-      <pointsize>12</pointsize>
+      <pointsize>10</pointsize>
       <weight>50</weight>
       <italic>false</italic>
       <bold>false</bold>
      </font>
     </property>
     <property name="text">
-     <string>Save</string>
+     <string>Snapshot</string>
     </property>
    </widget>
    <widget class="QTextBrowser" name="Movie_Text_Browser">
@@ -411,7 +411,7 @@ p, li { white-space: pre-wrap; }
     <property name="font">
      <font>
       <family>Arial Black</family>
-      <pointsize>12</pointsize>
+      <pointsize>10</pointsize>
       <weight>50</weight>
       <italic>false</italic>
       <bold>false</bold>

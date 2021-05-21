@@ -4,7 +4,9 @@ Created on Tue May  4 22:47:39 2021
 
 @author: MYOUNG-WOO
 
-MOKE microscope v1.0.0
+MOKE microscope v1.0.1
+
+Bug fix: Video recording without path name
 """
 
 from pyueye import ueye
@@ -201,21 +203,28 @@ class WindowClass(QMainWindow, form_class) :
             if 'vid' in locals() and self.Rec_Switch == -1:
                 # selecting file path
                 filePath, _ = QFileDialog.getSaveFileName(self, "Save Video", "", "avi(*.avi);;All Files(*.*) ")
-          
+                
                 # if file path is blank return back
                 if filePath == "":
-                    return
+                    del vid
+                    del self.Time
+                    #return
                 
-                self.fps = np.round(1/np.median(self.Time))
+                else:
+                    self.fps = np.round(1/np.median(self.Time))
+                    
+                    out = cv2.VideoWriter(filePath, cv2.VideoWriter_fourcc(*'DIVX'), self.fps, (self.width, self.height), isColor=False)
+                    for i in range(0, vid.shape[2]):
+                        img = vid[:, :, i]
+                        out.write(img)
+                    
+                    out.release()
+                    del vid
+                    del self.Time
                 
-                out = cv2.VideoWriter(filePath, cv2.VideoWriter_fourcc(*'DIVX'), self.fps, (self.width, self.height), isColor=False)
-                for i in range(0, vid.shape[2]):
-                    img = vid[:, :, i]
-                    out.write(img)
                 
-                out.release()
-                del vid
-                del self.Time
+                
+                
             
             self.img_resize = cv2.resize(self.FinalImage,(0,0), fx=0.5, fy=0.5)
             #self.img_resize = QtGui.QImage(self.img_resize, self.img_resize.shape[1], self.img_resize.shape[0], QtGui.QImage.Format_Indexed8)
