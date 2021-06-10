@@ -4,9 +4,9 @@ Created on Tue May  4 22:47:39 2021
 
 @author: MYOUNG-WOO
 
-MOKE microscope v1.0.1
+MOKE microscope v1.0.2
 
-Bug fix: Video recording without path name
+Bug fix: Conversion from 16 bit to 8 bit for Video recording
 """
 
 from pyueye import ueye
@@ -20,6 +20,7 @@ from PyQt5.QtGui import QPixmap, QColor
 from PyQt5.QtGui import *
 from PyQt5 import uic, QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QCoreApplication
+import pyvisa
 import time
 
 form_class = uic.loadUiType("MOKE_microscope.ui")[0]
@@ -38,6 +39,7 @@ class WindowClass(QMainWindow, form_class) :
         self.SetBG_Button.clicked.connect(self.Set_Background)
         self.SetFPS_Button.clicked.connect(self.Set_FPS)
         self.SetExp_Button.clicked.connect(self.Set_Exp)
+        self.SetCurr_Button.clicked.connect(self.Set_Curr)
         self.Save_Button.clicked.connect(self.Save)
         self.Rec_Button.clicked.connect(self.Rec)
         self.Exit_Button.clicked.connect(self.Exit)
@@ -47,7 +49,11 @@ class WindowClass(QMainWindow, form_class) :
         self.Contrast_Switch = -1
         self.Diff_Switch = -1
         self.SetBG_Switch = -1
+        self.KepcoInit_Switch = -1
         self.Rec_Switch = -1
+        
+        self.time_avg = 1
+        self.Img_Sum = 100
        
        # Indicator ###########################################################
         if self.Movie_Switch == 1:
@@ -97,7 +103,7 @@ class WindowClass(QMainWindow, form_class) :
         
         self.value = ueye.c_double(0)
         self.value_to_return = ueye.c_double()
-        self.nRet = ueye.is_SetAutoParameter(self.hcam, ueye.IS_SET_ENABLE_AUTO_GAIN, self.value, self.value_to_return)
+        #self.nRet = ueye.is_SetAutoParameter(self.hcam, ueye.IS_SET_ENABLE_AUTO_GAIN, self.value, self.value_to_return)
         
         self.SetFPS_lineEdit.setText(str("%.2f" % self.IDS_FPS).zfill(5))
         self.SetFPS_lineEdit.setAlignment(QtCore.Qt.AlignRight)
@@ -109,11 +115,11 @@ class WindowClass(QMainWindow, form_class) :
     def Camera_Initialization(self):
         self.hcam = ueye.HIDS(0)
         self.ret = ueye.is_InitCamera(self.hcam, None)
-        self.ret = ueye.is_SetColorMode(self.hcam, ueye.IS_CM_MONO8)
-        self.IDS_FPS = float(5)
+        self.ret = ueye.is_SetColorMode(self.hcam, ueye.IS_CM_MONO12)
+        self.IDS_FPS = float(50)
         self.newrate = ueye.DOUBLE(self.IDS_FPS)
         self.rate = ueye.DOUBLE(self.IDS_FPS)
-        self.IDS_exposure = float(150)
+        self.IDS_exposure = float(20)
         
         self.width = 2056
         self.height = 1542
@@ -126,7 +132,7 @@ class WindowClass(QMainWindow, form_class) :
         
         self.mem_ptr = ueye.c_mem_p()
         self.mem_id = ueye.int()
-        self.bitspixel = 8
+        self.bitspixel = 16
         self.ret = ueye.is_AllocImageMem(self.hcam, self.width, self.height, self.bitspixel, self.mem_ptr, self.mem_id)
         
         self.ret = ueye.is_SetImageMem(self.hcam, self.mem_ptr, self.mem_id)
@@ -138,6 +144,15 @@ class WindowClass(QMainWindow, form_class) :
         self.expms = ueye.DOUBLE(self.IDS_exposure)
         self.nRet = ueye.is_Exposure(self.hcam, ueye.IS_EXPOSURE_CMD_SET_EXPOSURE, self.expms, ueye.sizeof(self.expms))
         
+        self.pixelclock = ueye.c_uint(197)
+        self.nRet = ueye.is_PixelClock(self.hcam, ueye.IS_PIXELCLOCK_CMD_SET, self.pixelclock, 4)
+        #pixelclock = ueye.c_uint()
+        #ueye.is_PixelClock(hcam, ueye.IS_PIXELCLOCK_CMD_GET, pixelclock, 4)
+        
+        self.nRet = ueye.is_SetHardwareGain(self.hcam, 100, ueye.IS_IGNORE_PARAMETER, ueye.IS_IGNORE_PARAMETER, ueye.IS_IGNORE_PARAMETER)
+        #gg = ueye.c_uint()
+        #ueye.is_SetHWGainFactor(hcam, ueye.IS_GET_MASTER_GAIN_FACTOR, gg)
+        self.nRet = ueye.is_SetHardwareGamma(self.hcam, ueye.IS_SET_HW_GAMMA_ON)
         
     def Movie(self):
         self.Movie_Switch = -1*self.Movie_Switch
@@ -159,23 +174,37 @@ class WindowClass(QMainWindow, form_class) :
             self.Exp_Text_Browser.setText(str("%.2f" % self.exposure).zfill(5))
             self.Exp_Text_Browser.setAlignment(QtCore.Qt.AlignRight)
             
-            self.img_raw = ueye.get_data(self.mem_ptr, self.width, self.height, self.bitspixel, self.lineinc, copy=False)
+            
+            #kk = 0
+            #while(kk <= self.Img_Sum):
+            #    kk = kk+1    
+            #    
+            #    if kk == 1:
+            #        self.img_raw = (ueye.get_data(self.mem_ptr, self.width, self.height, self.bitspixel, self.lineinc, copy=True)).astype(np.float64)
+            #    else:
+            #        self.img_raw0 = (ueye.get_data(self.mem_ptr, self.width, self.height, self.bitspixel, self.lineinc, copy=True)).astype(np.float64)
+            #        self.img_raw = self.img_raw*(kk-1)/kk+self.img_raw0/kk
+            #        del self.img_raw0
+            #    
+            #    time.sleep(1/self.fps)
+            
+            self.img_raw = ueye.get_data(self.mem_ptr, self.width, self.height, self.bitspixel, self.lineinc, copy=True)
             
             if self.Diff_Switch == -1:
-                self.img = np.reshape(self.img_raw, (self.height, self.width, 1)).astype(np.uint8)
+                self.img = np.reshape(self.img_raw, (self.height, self.width, 1)).astype(np.uint16)
             elif self.Diff_Switch == 1:
                 self.img0 = (np.reshape(self.img_raw, (self.height, self.width, 1))).astype(np.float64)
-                self.img = np.round((self.img0-self.bg+255)/2).astype(np.uint8)
+                self.img = np.round((self.img0-self.bg+4095)/2).astype(np.uint16)
             
             if self.Contrast_Switch == 1:
                 self.img = np.reshape(self.img, (self.height, self.width))
                
                # Contrast stretching
-                #self.pL, self.pH = np.percentile(self.img, (2, 98))
-                #self.img = exposure.rescale_intensity(self.img, in_range=(self.pL, self.pH))
+                self.pL, self.pH = np.percentile(self.img, (2, 98))
+                self.img = exposure.rescale_intensity(self.img, in_range=(self.pL, self.pH), out_range=(0, 4095))
                
                # Equalization
-                self.img = img_as_ubyte(exposure.equalize_hist(self.img))
+                #self.img = img_as_ubyte(exposure.equalize_hist(self.img))
                
                # Adaptive Equalization 
                 #self.img = img_as_ubyte(exposure.equalize_adapthist(self.img, clip_limit=0.5))
@@ -215,18 +244,16 @@ class WindowClass(QMainWindow, form_class) :
                     
                     out = cv2.VideoWriter(filePath, cv2.VideoWriter_fourcc(*'DIVX'), self.fps, (self.width, self.height), isColor=False)
                     for i in range(0, vid.shape[2]):
-                        img = vid[:, :, i]
+                        img = (np.round(vid[:, :, i]/4095*255)-1).astype(np.uint8)
                         out.write(img)
                     
                     out.release()
                     del vid
-                    del self.Time
-                
-                
-                
+                    del self.Time               
                 
             
             self.img_resize = cv2.resize(self.FinalImage,(0,0), fx=0.5, fy=0.5)
+            self.img_resize = (self.img_resize/4095*255).astype(np.uint8)
             #self.img_resize = QtGui.QImage(self.img_resize, self.img_resize.shape[1], self.img_resize.shape[0], QtGui.QImage.Format_Indexed8)
             self.img_resize = QtGui.QImage(self.img_resize, self.img_resize.shape[1], self.img_resize.shape[0], QtGui.QImage.Format_Indexed8)
             
@@ -257,10 +284,25 @@ class WindowClass(QMainWindow, form_class) :
 
     
     def Set_Background(self):
-        self.bg_raw = ueye.get_data(self.mem_ptr, self.width, self.height, self.bitspixel, self.lineinc, copy=False)
-        time.sleep(0.5)
-        self.bg = np.reshape(self.bg_raw, (self.height, self.width, 1)).astype(np.float64)
-
+        #self.bg_raw = ueye.get_data(self.mem_ptr, self.width, self.height, self.bitspixel, self.lineinc, copy=False)
+        #time.sleep(0.5)
+        #self.bg = np.reshape(self.bg_raw, (self.height, self.width, 1)).astype(np.float64)
+        
+        kk = 0        
+        while(kk <= self.Img_Sum):
+            kk = kk+1    
+            
+            if kk == 1:
+                self.bg = (ueye.get_data(self.mem_ptr, self.width, self.height, self.bitspixel, self.lineinc, copy=True)).astype(np.float64)
+            else:
+                self.bg0 = (ueye.get_data(self.mem_ptr, self.width, self.height, self.bitspixel, self.lineinc, copy=True)).astype(np.float64)
+                self.bg = self.bg*(kk-1)/kk+self.bg0/kk
+                del self.bg0
+            
+            time.sleep(1/self.fps)
+            
+        self.bg = np.reshape(self.bg, (self.height, self.width, 1)).astype(np.float64)
+        
         
     def Set_FPS(self):
         if self.Movie_Switch == 1:
@@ -276,6 +318,32 @@ class WindowClass(QMainWindow, form_class) :
             self.nRet = ueye.is_Exposure(self.hcam, ueye.IS_EXPOSURE_CMD_SET_EXPOSURE, self.expms, ueye.sizeof(self.expms))
 
     
+    def Set_Curr(self):
+        if self.KepcoInit_Switch == -1:            
+            self.kepco_gpib = int(1)
+            self.rm = pyvisa.ResourceManager()
+        
+            self.kepco_inst = self.rm.open_resource('GPIB0::{gpib_add}::INSTR'.format(gpib_add=self.kepco_gpib), read_termination='\n', write_termination='\n')
+            
+            self.kepco_inst.write("*rst; status:preset; *cls")
+            self.kepco_inst.write("CURR:RANG 1")
+            self.kepco_inst.write("VOLT:RANG 1")
+            
+            self.kepco_inst.write("CURR 0")
+            self.kepco_inst.write("VOLT 20")
+                        
+            self.kepco_inst.write("FUNC:MODE CURR")
+            
+            self.KepcoInit_Switch = 1
+        
+        if self.KepcoInit_Switch == 1:
+            self.kepco_current = float(self.SetCurr_lineEdit.text())
+            
+            if abs(self.kepco_current) <= 10:
+                self.kepco_inst.write("CURR {curr}".format(curr=self.kepco_current))
+                self.kepco_inst.write("OUTP ON")        
+
+
     def Save(self):          
         # selecting file path
         filePath, _ = QFileDialog.getSaveFileName(self, "Save Image", "", "PNG(*.png);;JPEG(*.jpg *.jpeg);;All Files(*.*) ")
@@ -285,7 +353,47 @@ class WindowClass(QMainWindow, form_class) :
             return
           
         # saving canvas at desired path
-        # self.SaveImage.save("a.png")  
+        # self.SaveImage.save("a.png")
+        
+        kk = 0        
+        while(kk <= self.Img_Sum):
+            kk = kk+1    
+            
+            if kk == 1:
+                self.img_raw = (ueye.get_data(self.mem_ptr, self.width, self.height, self.bitspixel, self.lineinc, copy=True)).astype(np.float64)
+            else:
+                self.img_raw0 = (ueye.get_data(self.mem_ptr, self.width, self.height, self.bitspixel, self.lineinc, copy=True)).astype(np.float64)
+                self.img_raw = self.img_raw*(kk-1)/kk+self.img_raw0/kk
+                del self.img_raw0
+            
+            time.sleep(1/self.fps)
+        
+        self.img_raw = ueye.get_data(self.mem_ptr, self.width, self.height, self.bitspixel, self.lineinc, copy=True)
+        
+        if self.Diff_Switch == -1:
+            self.img = np.reshape(self.img_raw, (self.height, self.width, 1)).astype(np.uint16)
+        elif self.Diff_Switch == 1:
+            self.img0 = (np.reshape(self.img_raw, (self.height, self.width, 1))).astype(np.float64)
+            self.img = np.round((self.img0-self.bg+4095)/2).astype(np.uint16)
+        
+        if self.Contrast_Switch == 1:
+            self.img = np.reshape(self.img, (self.height, self.width))
+           
+           # Contrast stretching
+            #self.pL, self.pH = np.percentile(self.img, (2, 98))
+            #self.img = exposure.rescale_intensity(self.img, in_range=(self.pL, self.pH), out_range=(0, 4095))
+           
+           # Equalization
+            self.img = img_as_ubyte(exposure.equalize_hist(self.img))
+           
+           # Adaptive Equalization 
+            #self.img = img_as_ubyte(exposure.equalize_adapthist(self.img, clip_limit=0.5))
+            
+            self.img = np.reshape(self.img, (self.height, self.width, 1))
+
+
+        self.FinalImage = self.img
+        
         io.imsave(filePath, self.FinalImage)
         
         
@@ -300,6 +408,10 @@ class WindowClass(QMainWindow, form_class) :
         
     
     def Exit(self):
+        if self.KepcoInit_Switch == 1:
+            self.kepco_inst.write("CURR {curr}".format(curr=0))
+            self.kepco_inst.write("OUTP OFF")
+                
         self.Movie_Switch = -1
         #time.sleep(1)
         #cv2.destroyAllWindows()
